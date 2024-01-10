@@ -13,21 +13,18 @@ mongoose.connect('mongodb://127.0.0.1:27017/?directConnection=true&serverSelecti
 
 
 const app = express()
-app.use(cors({
-    origin: 'http://localhost:3000'
-}))
+app.use(cors())
 
 const server = createServer(app)
 const io = new Server(server, {
     cors: {
-        origin: 'http://localhost:3000'
+        origin: '*'
 
     }
 })
 
 io.on('connection', (socket) => {
     console.log('a user connected')
-    socket.emit("join", "hi")
 
     socket.on('join', async (chatId) => {
         try {
@@ -36,21 +33,40 @@ io.on('connection', (socket) => {
                 await Message.insertOne({ "chatId": chatId, messages: [] });
             }
             socket.join(chatId);
+            socket.emit("join", "hi")
         } catch (e) {
             console.error(e);
         }
     })
 
 
-    socket.on("message", ({ chatId, message }) => {
-        console.log('chatId : ', chatId, message)
+    socket.on("message", ({ chatId, message, userName }) => {
+        console.log('chatId : ', chatId, message, userName)
         Message.updateOne({ "chatId": chatId }, {
             "$push": {
-                "messages": message
+                "messages": { message: message, userName: userName }
             }
         });
-        io.to(chatId).emit("message", message);
+        io.to(chatId).emit("message", { message: message, userName: userName });
     });
+
+    socket.on("joinRoom", async ({ chatId, userName }) => {
+        console.log('joinRoom ==> ', chatId, userName)
+        try {
+            let result = await Message.findOne({ "chatId": chatId });
+            if (result) {
+                Message.updateOne({ "chatId": chatId }, {
+                    "$push": {
+                        "userInGroup": userName
+                    }
+                });
+                socket.join(chatId);
+                io.to(chatId).emit("joinRoom", userName);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    })
 })
 
 app.get('/chat/:chatId', async (req, res) => {
@@ -62,6 +78,8 @@ app.get('/chat/:chatId', async (req, res) => {
         res.status(500).send({ message: e.message });
     }
 })
+
+
 
 
 server.listen(APP_PORT, () => {
