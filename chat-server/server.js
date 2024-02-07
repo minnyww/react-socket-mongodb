@@ -5,6 +5,9 @@ const cors = require('cors')
 const mongoose = require('mongoose');
 const Message = require('./models/Message')
 const APP_PORT = 4000
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
+
 
 
 mongoose.connect('mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.1.1', {
@@ -13,7 +16,41 @@ mongoose.connect('mongodb://127.0.0.1:27017/?directConnection=true&serverSelecti
 
 
 const app = express()
-app.use(cors())
+app.use(cookieParser());
+const corsOptions = {
+    origin: ['http://localhost:3001', 'http://localhost:3002'],
+    credentials: true,
+};
+app.use(cors(corsOptions));
+
+
+function authChecker(req, res, next) {
+    console.log('req.session check =>  : ', req.session.user)
+    if (req.session.user) {
+        next();
+    } else {
+        next();
+    }
+}
+
+app.use(
+    session({
+        name: "SESS_NAME",
+        secret: "SESS_SECRET",
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+            sameSite: false,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 100000,
+            httpOnly: true,
+            domain: "localhost"
+        },
+    })
+);
+app.use(authChecker);
+
+
 
 const server = createServer(app)
 const io = new Server(server, {
@@ -80,6 +117,32 @@ app.get('/chat/:chatId', async (req, res) => {
 })
 
 
+app.post('/testSecurity', (req, res) => {
+    console.log('req => : ', req.headers)
+    console.log('cookieName => ', req.cookies)
+    res.status(200).send({ test: 'Min' })
+})
+
+
+app.post('/api/login', function (req, res, next) {
+    const sessionUser = {
+        id: "TestId",
+        username: "TestUser",
+        email: "testEmal",
+    };
+    req.session.user = sessionUser;
+    req.session.save();
+    res.cookie('cookieName', '1Tesssdsds2s', { expires: new Date(Date.now() + 900000), secure: false })
+    res.status(200).send(sessionUser.id)
+});
+
+app.post('/api/logout', function (req, res, next) {
+    req.session.destroy();
+    req.session = null
+    res.clearCookie('cookieName');
+    res.clearCookie('SESS_NAME');
+    res.status(200).send('logout')
+});
 
 
 server.listen(APP_PORT, () => {

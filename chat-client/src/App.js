@@ -2,6 +2,7 @@ import './App.css';
 import { socket } from './socket';
 import { useEffect, useState } from 'react'
 import useSWRImmutable from 'swr/immutable'
+import axios from 'axios'
 
 const fetcher = url => fetch(url).then(r => r.json())
 
@@ -59,9 +60,47 @@ function App() {
     localStorage.setItem('userName', tmpUserName)
   }
 
+  const testSec = async () => {
+    const { data } = axios.post('http://localhost:4000/testSecurity',
+      { logout: "" },
+      {
+        withCredentials: true,
+      })
+    console.log('data :: ', data)
+  }
+
+  const logout = async () => {
+    const { data } = axios.post('http://localhost:4000/api/logout',
+      { logout: "" },
+      {
+        withCredentials: true,
+      })
+    console.log('logout data :: ', data)
+  }
+
+
 
   return (
     <div style={{ margin: '4rem' }}>
+      <button onClick={() => {
+        testSec()
+      }}>test sec</button>
+      <button
+        onClick={async () => {
+          const { data } = await axios.post("http://localhost:4000/api/login", {
+            username: "test"
+          }, {
+            withCredentials: true
+          })
+          console.log("data : ", data)
+        }}>
+        login
+      </button>
+      <button
+        onClick={() => {
+          logout()
+        }}
+      >logout</button>
       <h2>
         Hi {`"${tmpUserName}"`} : {isConnected ? 'Connected' : 'Not Connected'}
       </h2>
